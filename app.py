@@ -59,7 +59,117 @@ def clean_number(value):
         return float(value)
     except Exception:
         return None
+# =========================================================
+# دریافت قیمت طلای ۱۸ عیار از TGJU
+# این مسیر مستقل از Bale است
+# =========================================================
 
+from html import unescape
+
+
+def get_tgju_gold18():
+
+    url = "https://www.tgju.org/profile/geram18"
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/109.0 Safari/537.36"
+        )
+    }
+
+    try:
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=15
+        )
+
+        response.raise_for_status()
+
+        # حذف script و style
+        text = re.sub(
+            r"<script.*?</script>",
+            " ",
+            response.text,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+
+        text = re.sub(
+            r"<style.*?</style>",
+            " ",
+            text,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+
+        # حذف تگ‌های HTML
+        text = re.sub(r"<[^>]+>", " ", text)
+
+        # تبدیل HTML entity
+        text = unescape(text)
+
+        # تبدیل اعداد فارسی/عربی
+        text = fa_to_en(text)
+
+        # فاصله‌های اضافی
+        text = re.sub(r"\s+", " ", text)
+
+        # پیدا کردن اولین نرخ فعلی
+        match = re.search(
+            r"نرخ\s*فعلی\s*:?\s*:?\s*([0-9,٬]+)",
+            text
+        )
+
+        if not match:
+            return {
+                "ok": False,
+                "source": "tgju",
+                "error": "قیمت طلای ۱۸ عیار در TGJU پیدا نشد"
+            }
+
+        price_rial = int(
+            match.group(1).replace(",", "").replace("٬", "")
+        )
+
+        price_toman = price_rial // 10
+
+        return {
+            "ok": True,
+            "source": "tgju",
+            "symbol": "geram18",
+            "title": "طلای ۱۸ عیار / ۷۵۰",
+            "karat": 18,
+            "purity": 750,
+            "unit": "gram",
+            "currency": "IRR",
+            "price_rial": price_rial,
+            "price_toman": price_toman,
+            "updated": datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        }
+
+    except requests.exceptions.Timeout:
+        return {
+            "ok": False,
+            "source": "tgju",
+            "error": "اتصال به TGJU timeout شد"
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {
+            "ok": False,
+            "source": "tgju",
+            "error": f"خطای اتصال به TGJU: {str(e)}"
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "source": "tgju",
+            "error": f"خطا: {str(e)}"
+        }
 
 # =========================================================
 # استخراج قیمت‌ها از پیام Bale
